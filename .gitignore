@@ -1,0 +1,8 @@
+.venv
+coco-dataset
+food-101-dataset
+runs
+trained_models
+yolo_dataset
+*.pt
+uv.lock
