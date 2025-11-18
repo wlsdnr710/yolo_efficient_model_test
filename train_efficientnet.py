@@ -14,7 +14,7 @@ import argparse
 # pip install timm
 
 def get_device():
-    """Detects and returns the best available device (CUDA, MPS, or CPU)."""
+    """하드웨어 감지 (CPU/GPU or MAC)"""
     if torch.cuda.is_available():
         return torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -23,7 +23,7 @@ def get_device():
         return torch.device("cpu")
 
 def calculate_accuracy(model, data_loader, device):
-    """Calculates the accuracy of the model on a given dataset."""
+    """모델의 정확도 평가 함수"""
     model.eval()  # Set the model to evaluation mode
     correct = 0
     total = 0
