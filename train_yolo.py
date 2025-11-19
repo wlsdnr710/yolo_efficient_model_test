@@ -9,6 +9,7 @@ import argparse
 from download_coco import download_coco2017
 from prepare_food_dataset import convert_coco_to_yolo
 
+
 def get_device():
     """모델의 정확도 평가 함수"""
     if torch.cuda.is_available():
@@ -17,6 +18,7 @@ def get_device():
         return torch.device("mps")
     else:
         return torch.device("cpu")
+
 
 def prepare_food_dataset():
     """
@@ -44,9 +46,12 @@ def prepare_food_dataset():
 
     return yolo_yaml_path
 
+
 def main():
     parser = argparse.ArgumentParser(description="YOLO Training Script")
-    parser.add_argument("--epochs", type=int, default=None, help="Number of epochs to train for")
+    parser.add_argument(
+        "--epochs", type=int, default=None, help="Number of epochs to train for"
+    )
     args = parser.parse_args()
 
     print("Starting YOLO training script...")
@@ -68,18 +73,25 @@ def main():
         print(f"Created model directory: {MODEL_DIR}")
 
     # Find the latest training run directory
-    base_run_dir = 'runs/detect'
-    run_name_prefix = 'train_food'
+    base_run_dir = "runs/detect"
+    run_name_prefix = "train_food"
     latest_run_dir = None
     if os.path.exists(base_run_dir):
-        run_dirs = sorted([d for d in os.listdir(base_run_dir) if d.startswith(run_name_prefix) and os.path.isdir(os.path.join(base_run_dir, d))])
+        run_dirs = sorted(
+            [
+                d
+                for d in os.listdir(base_run_dir)
+                if d.startswith(run_name_prefix)
+                and os.path.isdir(os.path.join(base_run_dir, d))
+            ]
+        )
         if run_dirs:
             latest_run_dir = os.path.join(base_run_dir, run_dirs[-1])
             print(f"Found latest training run at: {latest_run_dir}")
 
     last_checkpoint_path = None
     if latest_run_dir:
-        potential_checkpoint = os.path.join(latest_run_dir, 'weights/last.pt')
+        potential_checkpoint = os.path.join(latest_run_dir, "weights/last.pt")
         if os.path.exists(potential_checkpoint):
             last_checkpoint_path = potential_checkpoint
 
@@ -95,10 +107,12 @@ def main():
         try:
             # Load checkpoint separately to read metadata
             ckpt = torch.load(last_checkpoint_path, map_location=get_device())
-            completed_epochs = ckpt.get('epoch', -1) + 1  # epoch is 0-indexed
+            completed_epochs = ckpt.get("epoch", -1) + 1  # epoch is 0-indexed
             print(f"Checkpoint is from epoch {completed_epochs}.")
         except Exception as e:
-            print(f"Could not read epoch from checkpoint: {e}. Assuming 0 completed epochs.")
+            print(
+                f"Could not read epoch from checkpoint: {e}. Assuming 0 completed epochs."
+            )
             completed_epochs = 0
 
     elif os.path.exists(YOLO_MODEL_PATH):
@@ -106,8 +120,8 @@ def main():
         model_to_train = YOLO(YOLO_MODEL_PATH)
     else:
         print("No saved YOLO model found. Starting with pre-trained 'yolov8n.pt'.")
-        model_to_train = YOLO('yolov8n.pt')
-    
+        model_to_train = YOLO("yolov8n.pt")
+
     print("YOLO model initialized.")
 
     # --- Configuration ---
@@ -125,11 +139,15 @@ def main():
             return
 
     if resume_training and EPOCHS <= completed_epochs:
-        print(f"\nError: The model has already been trained for {completed_epochs} epochs.")
-        print(f"Please provide a total number of epochs greater than {completed_epochs} to continue training.")
+        print(
+            f"\nError: The model has already been trained for {completed_epochs} epochs."
+        )
+        print(
+            f"Please provide a total number of epochs greater than {completed_epochs} to continue training."
+        )
         return
 
-    BATCH_SIZE = 8
+    BATCH_SIZE = 32  # *** 조정하기 *** (8 기준 1.16GB)
 
     # --- Train YOLO ---
     print("\n--- Starting YOLO Training ---")
@@ -141,11 +159,15 @@ def main():
         epochs=EPOCHS,
         batch=BATCH_SIZE,
         imgsz=640,
-        project='runs/detect',
-        name='train_food',
+        project="runs/detect",
+        name="train_v2_safelr",
         device=device,
         save_period=1,
-        resume=resume_training
+        patience=30,
+        lr0=0.001,
+        resume=False,
+        workers=2,
+        optimizer="SGD",
     )
     print("YOLO training finished.")
 
@@ -153,22 +175,29 @@ def main():
     print("\n--- Saving YOLO Model ---")
     model_to_train.save(YOLO_MODEL_PATH)
     print(f"Final YOLO model explicitly saved to {YOLO_MODEL_PATH}")
-    
-    best_yolo_model_path = os.path.join(results.save_dir, 'weights/best.pt')
+
+    best_yolo_model_path = os.path.join(results.save_dir, "weights/best.pt")
     if not os.path.exists(best_yolo_model_path):
         best_yolo_model_path = YOLO_MODEL_PATH
 
     # --- Inference Example ---
     print("\n--- Starting YOLO Inference Example ---")
     model_yolo_trained = YOLO(best_yolo_model_path)
-    
+
     # Look for images in the validation directory of the prepared dataset
     val_images_dir = os.path.join(os.path.dirname(yolo_yaml_path), "images", "val")
-    
+
     if os.path.exists(val_images_dir) and os.listdir(val_images_dir):
         # Get the first image file from the validation set
-        test_image_name = next((f for f in os.listdir(val_images_dir) if os.path.isfile(os.path.join(val_images_dir, f))), None)
-        
+        test_image_name = next(
+            (
+                f
+                for f in os.listdir(val_images_dir)
+                if os.path.isfile(os.path.join(val_images_dir, f))
+            ),
+            None,
+        )
+
         if test_image_name:
             image_path_detection = os.path.join(val_images_dir, test_image_name)
             print(f"Performing inference on image: {image_path_detection}")
@@ -184,13 +213,16 @@ def main():
                 im.save(output_image_path)
                 print(f"Detections saved to {output_image_path}")
         else:
-            print("No image files found in the validation directory for inference example.")
+            print(
+                "No image files found in the validation directory for inference example."
+            )
     else:
         print("No images found for inference example.")
-        
+
     print("YOLO inference example finished.")
     print("\nYOLO script finished.")
 
-if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn', force=True)
+
+if __name__ == "__main__":
+    torch.multiprocessing.set_start_method("spawn", force=True)
     main()

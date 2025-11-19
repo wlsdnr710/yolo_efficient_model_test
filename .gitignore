@@ -3,7 +3,8 @@ coco-dataset
 food-101-dataset
 runs
 yolo_dataset
-*.pt
 uv.lock
 food-dataset
 .DS_Store
+.gemini/
+gha-creds-*.json
